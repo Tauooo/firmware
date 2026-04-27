@@ -28,9 +28,10 @@ case "$ENV_NAME" in
 
     gat562_mesh_trial_tracker_zhcn|gat562_mesh_trial_tracker)
         # ssp97's gat562 already enables OLED_CJK + has the right exclusions.
-        # We only need to add -DJP_IME=1 to the gat562_mesh_base block.
+        # We need to add -DJP_IME=1 AND the _min/_max macro defines (the
+        # OLEDDisplayCJK lib uses ESP-only Arduino macros that nRF52 lacks).
         if grep -q "JP_IME=1" "$TARGET_INI"; then
-            echo "JP_IME already set in $TARGET_INI"
+            echo "JP_IME and _min/_max already injected in $TARGET_INI"
         else
             python3 - "$TARGET_INI" <<'PY'
 import sys, re
@@ -38,8 +39,11 @@ path = sys.argv[1]
 with open(path) as f:
     src = f.read()
 
-# Inject  -D JP_IME=1  inside the build_flags of [env:gat562_mesh_base].
-# Match the whole block and append the flag before the next section header.
+# Inject  -D JP_IME=1 and the _min/_max defines inside the build_flags of
+# [env:gat562_mesh_base]. Match the whole block and append the flags before
+# the next section header.
+ADDS = '\n  -DJP_IME=1\n  -D_min=min\n  -D_max=max'
+
 def inject(match):
     block = match.group(0)
     if "JP_IME=1" in block:
@@ -47,7 +51,7 @@ def inject(match):
     # Find the build_flags = ... block and append.
     new = re.sub(
         r"(build_flags\s*=\s*\$\{nrf52840_base\.build_flags\}.*?)(\n[a-zA-Z])",
-        r"\1\n  -DJP_IME=1\2",
+        r"\1" + ADDS + r"\2",
         block, count=1, flags=re.DOTALL,
     )
     return new
@@ -59,7 +63,7 @@ src2 = re.sub(
 )
 with open(path, "w") as f:
     f.write(src2)
-print(f"Injected -DJP_IME=1 into [env:gat562_mesh_base] in {path}")
+print(f"Injected JP_IME=1 + _min/_max into [env:gat562_mesh_base] in {path}")
 PY
         fi
         ;;
