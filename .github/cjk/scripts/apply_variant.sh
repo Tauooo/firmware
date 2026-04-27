@@ -42,7 +42,7 @@ with open(path) as f:
 # Inject  -D JP_IME=1 and the _min/_max defines inside the build_flags of
 # [env:gat562_mesh_base]. Match the whole block and append the flags before
 # the next section header.
-ADDS = '\n  -DJP_IME=1\n  -D_min=min\n  -D_max=max'
+ADDS = '\n  -DJP_IME=1\n  -D_min=min\n  -D_max=max\n  -DMESHTASTIC_EXCLUDE_EMOTES=1'
 
 def inject(match):
     block = match.group(0)
