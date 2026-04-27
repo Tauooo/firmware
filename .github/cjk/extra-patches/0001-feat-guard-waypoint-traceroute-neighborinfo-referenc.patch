@@ -1,0 +1,97 @@
+From 98d2e3f6c72ba30519b7ca6d6c2024a92d27b3cd Mon Sep 17 00:00:00 2001
+From: ci <ci@local>
+Date: Mon, 27 Apr 2026 23:24:42 +0000
+Subject: [PATCH] feat: guard waypoint/traceroute/neighborinfo references for
+ module exclusion
+
+Adds #if !MESHTASTIC_EXCLUDE_WAYPOINT around the waypoint frame slot
+assignment in Screen.cpp, #if !MESHTASTIC_EXCLUDE_TRACEROUTE around
+the three traceroute call sites in MenuHandler.cpp, and
+#if !MESHTASTIC_EXCLUDE_NEIGHBORINFO around the neighbor reset call
+in NodeDB.cpp. Without these guards, defining the corresponding
+exclusion macros would compile out the module implementations but
+leave dangling external references to waypointModule/traceRouteModule/
+neighborInfoModule, causing link errors. With these guards, the
+exclusions yield ~30KB of compiled flash savings on flash-tight
+nRF52840 builds.
+---
+ src/graphics/Screen.cpp           | 2 ++
+ src/graphics/draw/MenuHandler.cpp | 6 ++++++
+ src/mesh/NodeDB.cpp               | 2 ++
+ 3 files changed, 10 insertions(+)
+
+diff --git a/src/graphics/Screen.cpp b/src/graphics/Screen.cpp
+index 378a1b2..650c129 100644
+--- a/src/graphics/Screen.cpp
++++ b/src/graphics/Screen.cpp
+@@ -1196,8 +1196,10 @@ void Screen::setFrames(FrameFocus focus)
+             MeshModule *m = *i;
+             if (m && m->isRequestingFocus())
+                 fsi.positions.focusedModule = numframes;
++#if !MESHTASTIC_EXCLUDE_WAYPOINT
+             if (m && m == waypointModule)
+                 fsi.positions.waypoint = numframes;
++#endif
+ 
+             indicatorIcons.push_back(icon_module);
+             numframes++;
+diff --git a/src/graphics/draw/MenuHandler.cpp b/src/graphics/draw/MenuHandler.cpp
+index c67f40d..86117a1 100644
+--- a/src/graphics/draw/MenuHandler.cpp
++++ b/src/graphics/draw/MenuHandler.cpp
+@@ -1215,9 +1215,11 @@ void menuHandler::favoriteBaseMenu()
+             menuHandler::menuQueue = menuHandler::RemoveFavorite;
+             screen->runNow();
+         } else if (selected == TraceRoute) {
++#if !MESHTASTIC_EXCLUDE_TRACEROUTE
+             if (traceRouteModule) {
+                 traceRouteModule->launch(graphics::UIRenderer::currentFavoriteNodeNum);
+             }
++#endif
+         }
+     };
+     screen->showOverlayBanner(bannerOptions);
+@@ -1475,10 +1477,12 @@ void menuHandler::manageNodeMenu()
+         }
+ 
+         if (selected == TraceRoute) {
++#if !MESHTASTIC_EXCLUDE_TRACEROUTE
+             LOG_INFO("Starting traceroute to %08X", menuHandler::pickedNodeNum);
+             if (traceRouteModule) {
+                 traceRouteModule->startTraceRoute(menuHandler::pickedNodeNum);
+             }
++#endif
+             return;
+         }
+ 
+@@ -2285,10 +2289,12 @@ void menuHandler::removeFavoriteMenu()
+ void menuHandler::traceRouteMenu()
+ {
+     screen->showNodePicker(UI_STR("Node to Trace", "选择追踪节点"), 30000, [](uint32_t nodenum) -> void {
++#if !MESHTASTIC_EXCLUDE_TRACEROUTE
+         LOG_INFO("Menu: Node picker selected node 0x%08x, traceRouteModule=%p", nodenum, traceRouteModule);
+         if (traceRouteModule) {
+             traceRouteModule->startTraceRoute(nodenum);
+         }
++#endif
+     });
+ }
+ 
+diff --git a/src/mesh/NodeDB.cpp b/src/mesh/NodeDB.cpp
+index 417d950..948c18a 100644
+--- a/src/mesh/NodeDB.cpp
++++ b/src/mesh/NodeDB.cpp
+@@ -1031,8 +1031,10 @@ void NodeDB::resetNodes(bool keepFavorites)
+     devicestate.has_rx_waypoint = false;
+     saveNodeDatabaseToDisk();
+     saveDeviceStateToDisk();
++#if !MESHTASTIC_EXCLUDE_NEIGHBORINFO
+     if (neighborInfoModule && moduleConfig.neighbor_info.enabled)
+         neighborInfoModule->resetNeighbors();
++#endif
+ }
+ 
+ void NodeDB::removeNodeByNum(NodeNum nodeNum)
+-- 
+2.43.0
+
